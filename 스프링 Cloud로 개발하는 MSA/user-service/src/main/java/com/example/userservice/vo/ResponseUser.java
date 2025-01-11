@@ -1,4 +1,4 @@
-package com.example.userservice.controller.vo;
+package com.example.userservice.vo;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;

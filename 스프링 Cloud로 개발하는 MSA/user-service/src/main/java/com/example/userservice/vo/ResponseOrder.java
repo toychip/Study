@@ -1,4 +1,4 @@
-package com.example.userservice.controller.vo;
+package com.example.userservice.vo;
 
 import java.util.Date;
 import lombok.Data;
