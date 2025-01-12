@@ -90,4 +90,4 @@ spring:
 #            - AddResponseHeader=second-response, second-response-header2
 
 token:
-  secret: user_token
+  secret: UcQUIfHcUqsgNJcMuvjAABJC35/4k/1PVjQ3r6KYrN80cAN0nmgGe56xGXpqKl2eQXVWBpwBtlG3QFwTG9+m5A==
