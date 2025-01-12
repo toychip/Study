@@ -28,6 +28,12 @@ public class UserServiceImpl implements UserService {
 
         ModelMapper mapper = new ModelMapper();
         mapper.getConfiguration().setMatchingStrategy(MatchingStrategies.STRICT);
+
+        UserEntity isExists = userRepository.findByEmail(userDto.getEmail());
+        if (isExists != null) {
+            throw new IllegalArgumentException("이미 중복된 회원이 존재함");
+        }
+
         UserEntity userEntity = mapper.map(userDto, UserEntity.class);
         userEntity.setEncryptedPwd(encoder.encode(userDto.getPwd()));
         userRepository.save(userEntity);

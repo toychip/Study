@@ -27,3 +27,7 @@ spring:
 
 greeting:
   message: Welcome to th Simple E-Commere
+
+token:
+  expiration_time: 86400000
+  secret: user_token
