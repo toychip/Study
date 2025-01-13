@@ -35,3 +35,9 @@ greeting:
 #token:
 #  expiration_time: 86400000
 #  secret: UcQUIfHcUqsgNJcMuvjAABJC35/4k/1PVjQ3r6KYrN80cAN0nmgGe56xGXpqKl2eQXVWBpwBtlG3QFwTG9+m5A==
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: refresh, health, beans

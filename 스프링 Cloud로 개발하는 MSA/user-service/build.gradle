@@ -38,6 +38,9 @@ dependencies {
     implementation 'org.modelmapper:modelmapper:2.4.2'
 
     implementation 'org.springframework.boot:spring-boot-starter-security'
+
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
     implementation 'org.springframework.security:spring-security-config:5.4.2'
 
     compileOnly 'org.projectlombok:lombok'
