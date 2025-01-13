@@ -13,6 +13,10 @@ eureka:
 spring:
   application:
     name: user-service
+  cloud:
+    config:
+      uri: http://localhost:8888
+      name: spring-cloud-study-config
   h2:
     console:
       enabled: true
@@ -28,6 +32,6 @@ spring:
 greeting:
   message: Welcome to th Simple E-Commere
 
-token:
-  expiration_time: 86400000
-  secret: UcQUIfHcUqsgNJcMuvjAABJC35/4k/1PVjQ3r6KYrN80cAN0nmgGe56xGXpqKl2eQXVWBpwBtlG3QFwTG9+m5A==
+#token:
+#  expiration_time: 86400000
+#  secret: UcQUIfHcUqsgNJcMuvjAABJC35/4k/1PVjQ3r6KYrN80cAN0nmgGe56xGXpqKl2eQXVWBpwBtlG3QFwTG9+m5A==
