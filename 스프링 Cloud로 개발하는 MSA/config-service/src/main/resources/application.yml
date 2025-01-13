@@ -8,4 +8,8 @@ spring:
     config:
       server:
         git:
-          uri: ~~
+          uri: https://github.com/toychip/Study.git
+          default-label: master
+          search-paths:
+            - "스프링 Cloud로 개발하는 MSA"
+            - "스프링 Cloud로 개발하는 MSA/spring-cloud-study-config.yml"
