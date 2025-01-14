@@ -17,6 +17,8 @@ spring:
     config:
       uri: http://localhost:8888
       name: spring-cloud-study-config
+      profile: dev
+
   h2:
     console:
       enabled: true

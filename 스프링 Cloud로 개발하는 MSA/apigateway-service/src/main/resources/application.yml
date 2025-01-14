@@ -15,6 +15,7 @@ spring:
     config:
       uri: http://localhost:8888
       name: spring-cloud-study-config
+      profile: dev
     gateway:
       default-filters:
         - name: GlobalFilter
@@ -105,3 +106,8 @@ management:
     web:
       exposure:
         include: refresh, health, beans, httptrace
+
+logging:
+  level:
+    org.springframework.cloud: DEBUG
+    org.springframework.core.env: DEBUG
