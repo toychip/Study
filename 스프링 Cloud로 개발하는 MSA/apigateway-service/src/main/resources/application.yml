@@ -12,6 +12,9 @@ spring:
   application:
     name: apigateway-service
   cloud:
+    config:
+      uri: http://localhost:8888
+      name: spring-cloud-study-config
     gateway:
       default-filters:
         - name: GlobalFilter
@@ -97,5 +100,8 @@ spring:
 #            - AddRequestHeader=second-request, second-request-header2
 #            - AddResponseHeader=second-response, second-response-header2
 
-token:
-  secret: UcQUIfHcUqsgNJcMuvjAABJC35/4k/1PVjQ3r6KYrN80cAN0nmgGe56xGXpqKl2eQXVWBpwBtlG3QFwTG9+m5A==
+management:
+  endpoints:
+    web:
+      exposure:
+        include: refresh, health, beans, httptrace
