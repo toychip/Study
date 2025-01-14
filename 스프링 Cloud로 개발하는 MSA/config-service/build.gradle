@@ -24,6 +24,12 @@ ext {
 dependencies {
     // Spring Cloud Config Server 예시를 사용
     implementation 'org.springframework.cloud:spring-cloud-config-server'
+
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    implementation 'org.springframework.cloud:spring-cloud-starter-bootstrap'
+
+    implementation 'org.springframework.cloud:spring-cloud-starter-bus-amqp'
 }
 
 dependencyManagement {

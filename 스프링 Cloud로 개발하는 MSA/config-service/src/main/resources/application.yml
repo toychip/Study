@@ -13,3 +13,15 @@ spring:
           search-paths:
             - "스프링 Cloud로 개발하는 MSA"
 #            - "스프링 Cloud로 개발하는 MSA/spring-cloud-study-config.yml"
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, busrefresh

@@ -18,6 +18,11 @@ spring:
       uri: http://localhost:8888
       name: spring-cloud-study-config
       profile: dev
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
 
   h2:
     console:
@@ -42,4 +47,4 @@ management:
   endpoints:
     web:
       exposure:
-        include: refresh, health, beans
+        include: refresh, health, beans, busrefresh
