@@ -112,7 +112,7 @@ management:
       exposure:
         include: refresh, health, beans, httptrace, busrefresh
 
-logging:
-  level:
-    org.springframework.cloud: DEBUG
-    org.springframework.core.env: DEBUG
+#logging:
+#  level:
+#    org.springframework.cloud: DEBUG
+#    org.springframework.core.env: DEBUG

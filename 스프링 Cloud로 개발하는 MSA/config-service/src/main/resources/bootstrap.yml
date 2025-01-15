@@ -1,0 +1,3 @@
+# 실제로는 public으로 공개 X
+encrypt:
+  key: abcdefghijklmnopqrstuvwxyz1234567890
