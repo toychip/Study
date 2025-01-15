@@ -79,6 +79,8 @@ spring:
           uri: lb://ORDER-SERVICE
           predicates:
             - Path=/order-service/**
+          filters:
+            - AuthorizationHeaderFilter
 
         - id: first-service
           uri: lb://MY_FIRST_SERVICE
