@@ -4,3 +4,13 @@ spring:
     driver-class-name: org.h2.Driver
     username: sa
     password: '{cipher}a6a66e360beb265fb7946b01b1746d39fd3199ac10f472b7d6afa482be83defa'
+
+order_service:
+  url: http://ORDER-SERVICE/order-service/%s/orders
+
+token:
+  expiration_time: 986400000
+  secret: UcQUIfHcUqsgNJcMuvjAABJC35/4k/1PVjQ3r6KYrN80cAN0nmgGe56xGXpqKl2eQXVWBpwBtlG3QFwTG9+m5A==
+
+gateway:
+  ip: 127.0.0.1
