@@ -7,6 +7,8 @@ spring:
 
 order_service:
   url: http://ORDER-SERVICE/order-service/%s/orders
+  exception:
+    orders_is_empty: User's orders is empty
 
 token:
   expiration_time: 986400000
