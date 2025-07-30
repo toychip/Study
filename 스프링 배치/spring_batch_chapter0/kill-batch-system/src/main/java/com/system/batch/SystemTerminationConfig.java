@@ -1,4 +1,4 @@
-package com.system.batch.config;
+package com.system.batch;
 
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
@@ -7,18 +7,18 @@ import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
-@Import(BatchConfig.class)
+@Configuration
 public class SystemTerminationConfig {
-    private final JobRepository jobRepository;
-    private final PlatformTransactionManager transactionManager;
-
     private AtomicInteger processesKilled = new AtomicInteger(0);
     private final int TERMINATION_TARGET = 5;
+
+    private final JobRepository jobRepository;
+    private final PlatformTransactionManager transactionManager;
 
     public SystemTerminationConfig(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         this.jobRepository = jobRepository;

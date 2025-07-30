@@ -149,11 +149,12 @@ public ItemWriter<String> itemWriter() {
 
 ### 두 가지 접근 방식
 
-#### 1. 원시적 방식 (Raw Spring Batch)
-- Spring Boot 없이 순수 Spring Batch만 사용
+#### 1. 원시적 방식 (Spring)
+- Spring Boot 없이 순수 Spring + Spring Batch 사용
 - 모든 설정을 수동으로 구성
 - 필요한 Bean들을 수동 등록
 - CommandLineJobRunner로 명령줄에서 배치 실행
+- @Import와 BaseConfig 분리 필요
 - Spring Boot 편리함을 느끼기 위한 기초 학습용
 
 #### 2. Spring Boot 방식
@@ -161,6 +162,7 @@ public ItemWriter<String> itemWriter() {
 - 복잡한 설정은 프레임워크가 자동 처리
 - 개발자는 핵심 비즈니스 로직에만 집중
 - JobLauncherApplicationRunner가 자동으로 배치 실행
+- @Import와 BaseConfig 불필요, @Configuration 하나로 해결
 
 **메인 애플리케이션 클래스**
 ```java
@@ -181,3 +183,98 @@ public class KillBatchSystemApplication {
 ### 핵심 차이점
 - **원시적 방식**: 모든 설정을 수동으로 구성, CommandLineJobRunner 사용
 - **Spring Boot 방식**: 자동 설정 활용, JobLauncherApplicationRunner가 자동으로 배치 실행
+
+## 2단계: HelloDeath Batch - 첫 번째 배치 시스템 구축
+
+### 배치 작업 시나리오
+1. **시스템 접속** (enterWorldStep)
+2. **관리자 확인** (meetNPCStep)  
+3. **프로세스 처리** (defeatProcessStep)
+4. **작업 완료** (completeQuestStep)
+
+### Spring 구현
+
+#### BatchConfig - 기본 설정
+```java
+@Configuration
+public class BatchConfig extends DefaultBatchConfiguration {
+
+    @Bean
+    public DataSource dataSource() {
+        return new EmbeddedDatabaseBuilder()
+                .setType(EmbeddedDatabaseType.H2)
+                .addScript("org/springframework/batch/core/schema-h2.sql")
+                .build();
+    }
+
+    @Bean
+    public PlatformTransactionManager transactionManager() {
+        return new DataSourceTransactionManager(dataSource());
+    }
+}
+```
+
+#### SystemTerminationConfig - 비즈니스 로직
+```java
+@Import(BatchConfig.class)
+public class SystemTerminationConfig {
+    private final JobRepository jobRepository;
+    private final PlatformTransactionManager transactionManager;
+
+    public SystemTerminationConfig(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
+        this.jobRepository = jobRepository;
+        this.transactionManager = transactionManager;
+    }
+
+    @Bean
+    public Job systemTerminationSimulationJob() {
+        return new JobBuilder("systemTerminationSimulationJob", jobRepository)
+                .start(enterWorldStep())
+                .next(meetNPCStep())
+                .next(defeatProcessStep())
+                .next(completeQuestStep())
+                .build();
+    }
+
+    @Bean
+    public Step enterWorldStep() {
+        return new StepBuilder("enterWorldStep", jobRepository)
+                .tasklet((contribution, chunkContext) -> {
+                    System.out.println("배치 시스템에 접속했습니다!");
+                    return RepeatStatus.FINISHED;
+                }, transactionManager)
+                .build();
+    }
+}
+```
+
+### Spring Boot 방식 구현
+
+#### SystemTerminationConfig - 단일 설정으로 해결
+```java
+@Configuration
+public class SystemTerminationConfig {
+    private final JobRepository jobRepository;
+    private final PlatformTransactionManager transactionManager;
+
+    public SystemTerminationConfig(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
+        this.jobRepository = jobRepository;
+        this.transactionManager = transactionManager;
+    }
+
+    @Bean
+    public Job systemTerminationSimulationJob() {
+        return new JobBuilder("systemTerminationSimulationJob", jobRepository)
+                .start(enterWorldStep())
+                .next(meetNPCStep())
+                .next(defeatProcessStep())
+                .next(completeQuestStep())
+                .build();
+    }
+}
+```
+
+### 핵심 차이점
+- **원시적 방식**: @Import(BatchConfig.class) 필요, BaseConfig 분리
+- **Spring Boot 방식**: @Import 불필요, @Configuration 하나로 모든 설정 해결
+- **자동 주입**: Spring Boot가 JobRepository, PlatformTransactionManager 자동 구성
