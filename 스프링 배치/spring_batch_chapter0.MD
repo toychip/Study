@@ -128,3 +128,56 @@ public ItemWriter<String> itemWriter() {
 3. **데이터 소스 연결**: ItemReader/ItemWriter를 통한 데이터 입출력
 4. **에러 처리**: 예외 상황에 대한 적절한 처리
 5. **성능 최적화**: 청크 크기, 병렬 처리 등 최적화 설정
+
+## 데이터 처리 컴포넌트 활용
+
+### 핵심 컴포넌트
+- **ItemReader**: 데이터 소스에서 데이터를 읽어오는 컴포넌트
+- **ItemWriter**: 처리된 데이터를 저장소에 쓰는 컴포넌트  
+- **ItemProcessor**: 읽은 데이터를 가공하고 필터링하는 컴포넌트
+
+### 개발자가 직접 구현해야 하는 부분
+1. **세부 로직**: 파일 포맷, SQL 쿼리 조건, 컬럼 매핑 방식 등
+2. **비즈니스 로직**: ItemProcessor를 통한 데이터 가공 및 필터링
+3. **커스텀 컴포넌트**: Spring Batch가 제공하지 않는 데이터 소스 처리
+
+### 단순 작업 처리
+- 파일 복사, 디렉토리 정리, 알림 발송 등
+- Spring Batch가 제공하는 포인트를 활용하여 직접 구현
+
+## 실제 배치 시스템 구축
+
+### 두 가지 접근 방식
+
+#### 1. 원시적 방식 (Raw Spring Batch)
+- Spring Boot 없이 순수 Spring Batch만 사용
+- 모든 설정을 수동으로 구성
+- 필요한 Bean들을 수동 등록
+- CommandLineJobRunner로 명령줄에서 배치 실행
+- Spring Boot 편리함을 느끼기 위한 기초 학습용
+
+#### 2. Spring Boot 방식
+- Spring Boot 자동 설정 활용
+- 복잡한 설정은 프레임워크가 자동 처리
+- 개발자는 핵심 비즈니스 로직에만 집중
+- JobLauncherApplicationRunner가 자동으로 배치 실행
+
+**메인 애플리케이션 클래스**
+```java
+@SpringBootApplication
+public class KillBatchSystemApplication {
+    public static void main(String[] args) {
+        System.exit(SpringApplication.exit(SpringApplication.run(KillBatchSystemApplication.class, args)));
+    }
+}
+```
+
+**System.exit() 사용 이유**
+- 배치 작업 성공/실패 상태를 exit code로 외부 시스템에 전달
+- 실무에서 배치 모니터링과 제어에 필수
+- 정상 완료: 0, 실패: 0이 아닌 값 반환
+- 외부 스케줄러나 모니터링 시스템에서 배치 실행 결과 판단 가능
+
+### 핵심 차이점
+- **원시적 방식**: 모든 설정을 수동으로 구성, CommandLineJobRunner 사용
+- **Spring Boot 방식**: 자동 설정 활용, JobLauncherApplicationRunner가 자동으로 배치 실행
