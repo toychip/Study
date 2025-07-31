@@ -8,6 +8,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Optional;
 
 @Component
 @EnableScheduling
@@ -29,17 +30,20 @@ public class ManualBatchRunner {
     @Scheduled(cron = "0 0 3 * * ?")
     public void runZombieCleanupJob() {
         String jobToRun = "zombieCleanupJob";
-        jobs.jobMetaDatas().stream()
-                .filter(j -> j.jobName().equals(jobToRun))
-                .findFirst()
-                .ifPresent(j -> {
-                    try {
-                        jobLauncher.run(j.job(), new JobParametersBuilder()
-                                .addLong("time", System.currentTimeMillis())
-                                .toJobParameters());
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
-                });
+        Optional<Job> jobOpt = jobs.findByJobName(jobToRun);
+
+        if (jobOpt.isEmpty()) {
+            System.err.println("존재하지 않는 잡: " + jobToRun);
+            return;
+        }
+
+        try {
+            jobLauncher.run(jobOpt.get(), new JobParametersBuilder()
+                    .addLong("time", System.currentTimeMillis())
+                    .toJobParameters());
+        } catch (Exception e) {
+            System.err.println("Job 실행 중 오류: " + e.getMessage());
+            throw new RuntimeException(e);
+        }
     }
 }
