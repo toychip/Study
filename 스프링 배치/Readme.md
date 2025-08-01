@@ -564,3 +564,213 @@ public Step processStep(JobRepository jobRepository, PlatformTransactionManager 
 - **Reader-Processor-Writer 패턴**: 대용량 데이터를 처리하기 위한 최적의 아키텍처
 - **변경에 강함**: 요구사항 변경 시 해당 컴포넌트만 수정하면 됨
 - **표준화된 구조**: 데이터를 다루는 배치 작업의 표준 패턴
+
+## Job Parameters - 배치의 운명을 결정짓는 통제 변수
+
+### Job Parameters란?
+- **정의**: 배치 작업에 전달되는 입력 값
+- **역할**: 배치가 어떤 조건에서, 어떤 데이터를 다룰지를 결정
+- **목적**: 동적이고 유연한 배치 작업 실행
+
+### Job Parameters가 필요한 이유
+
+#### 1. 입력값 동적 변경
+- **웹 요청 기반 배치**: 요청마다 새로운 Job 실행
+- **프로퍼티 한계**: 앱 시작 시 한 번 주입되는 정적 값
+- **Job Parameters 장점**: 실행 중 동적 값 변경 가능
+
+#### 2. 메타데이터 관리
+- **Spring Batch 메타데이터**: JobRepository에 모든 값 기록
+- **Job 인스턴스 식별**: 재시작 처리 가능
+- **실행 이력 추적**: Job과 Step의 실행 정보 관리
+- **프로퍼티 한계**: 메타데이터로 기록되지 않음
+
+### Job Parameters vs 프로퍼티 차이점
+
+| 구분 | Job Parameters | 프로퍼티 |
+|------|----------------|----------|
+| **동적 변경** | 실행 중 변경 가능 | 앱 시작 시 한 번만 |
+| **메타데이터** | Spring Batch 메타데이터로 기록 | 기록되지 않음 |
+| **재시작** | Job 인스턴스 식별 및 재시작 가능 | 불가능 |
+| **실무 활용** | CI/CD 도구, 스케줄러 지원 | 제한적 |
+
+### Job Parameters 전달 방법
+
+#### 커맨드라인에서 전달
+```bash
+./gradlew bootRun --args='--spring.batch.job.name=dataProcessingJob inputFilePath=/data/input/users.csv,java.lang.String'
+```
+
+#### Job Parameters 표기법
+```
+parameterName=parameterValue,parameterType,identificationFlag
+```
+
+**구성 요소:**
+- **parameterName**: Job에서 파라미터를 찾을 때 사용할 key
+- **parameterValue**: 파라미터의 실제 값
+- **parameterType**: 파라미터 타입 (생략 시 String으로 가정)
+- **identificationFlag**: JobInstance 식별에 사용 여부 (생략 시 true)
+
+#### 여러 파라미터 전달
+```bash
+./gradlew bootRun --args='--spring.batch.job.name=dataProcessingJob inputFilePath=/data/input/users.csv,java.lang.String userCount=5,java.lang.Integer,false'
+```
+
+### 다양한 타입의 Job Parameters
+
+#### 1. 기본 데이터 타입
+```java
+@Bean
+@StepScope
+public Tasklet terminatorTasklet(
+    @Value("#{jobParameters['terminatorId']}") String terminatorId, 
+    @Value("#{jobParameters['targetCount']}") Integer targetCount
+) {
+    return (contribution, chunkContext) -> {
+        log.info("시스템 종결자 정보:");
+        log.info("ID: {}", terminatorId);
+        log.info("제거 대상 수: {}", targetCount);
+        return RepeatStatus.FINISHED;
+    };
+}
+```
+
+**실행 명령:**
+```bash
+./gradlew bootRun --args='--spring.batch.job.name=processTerminatorJob terminatorId=KILL-9,java.lang.String targetCount=5,java.lang.Integer'
+```
+
+#### 2. 날짜와 시간 타입
+```java
+@Bean
+@StepScope
+public Tasklet terminatorTasklet(
+    @Value("#{jobParameters['executionDate']}") LocalDate executionDate,
+    @Value("#{jobParameters['startTime']}") LocalDateTime startTime
+) {
+    return (contribution, chunkContext) -> {
+        log.info("처형 예정일: {}", executionDate.format(DateTimeFormatter.ofPattern("yyyy년 MM월 dd일")));
+        log.info("작전 개시 시각: {}", startTime.format(DateTimeFormatter.ofPattern("yyyy년 MM월 dd일 HH시 mm분 ss초")));
+        return RepeatStatus.FINISHED;
+    };
+}
+```
+
+**실행 명령:**
+```bash
+./gradlew bootRun --args='--spring.batch.job.name=terminatorJob executionDate=2024-01-01,java.time.LocalDate startTime=2024-01-01T14:30:00,java.time.LocalDateTime'
+```
+
+**날짜/시간 형식:**
+- **LocalDate**: 'yyyy-MM-dd' 형식
+- **LocalDateTime**: 'yyyy-MM-ddThh:mm:ss' 형식
+- **ISO 표준 형식**: DateTimeFormatter의 ISO 표준 사용
+
+#### 3. Enum 타입
+```java
+public enum QuestDifficulty { EASY, NORMAL, HARD, EXTREME }
+
+@Bean
+@StepScope
+public Tasklet terminatorTasklet(
+    @Value("#{jobParameters['questDifficulty']}") QuestDifficulty questDifficulty
+) {
+    return (contribution, chunkContext) -> {
+        log.info("임무 난이도: {}", questDifficulty);
+        int baseReward = 100;
+        int rewardMultiplier = switch (questDifficulty) {
+            case EASY -> 1;
+            case NORMAL -> 2;
+            case HARD -> 3;
+            case EXTREME -> 5;
+        };
+        return RepeatStatus.FINISHED;
+    };
+}
+```
+
+**실행 명령:**
+```bash
+./gradlew bootRun --args='--spring.batch.job.name=terminatorJob questDifficulty=HARD,com.system.batch.TerminatorConfig$QuestDifficulty'
+```
+
+### POJO를 활용한 Job Parameters 주입
+
+#### SystemInfiltrationParameters 클래스
+```java
+@StepScope
+@Component
+public class SystemInfiltrationParameters {
+    @Value("#{jobParameters[missionName]}")
+    private String missionName;
+    
+    private int securityLevel;
+    private final String operationCommander;
+    
+    public SystemInfiltrationParameters(@Value("#{jobParameters[operationCommander]}") String operationCommander) {
+        this.operationCommander = operationCommander;
+    }
+    
+    @Value("#{jobParameters[securityLevel]}")
+    public void setSecurityLevel(int securityLevel) {
+        this.securityLevel = securityLevel;
+    }
+    
+    // getter 메서드들
+}
+```
+
+#### POJO 사용 Tasklet
+```java
+@Bean
+public Tasklet terminatorTasklet(SystemInfiltrationParameters infiltrationParams) {
+    return (contribution, chunkContext) -> {
+        log.info("임무 코드네임: {}", infiltrationParams.getMissionName());
+        log.info("보안 레벨: {}", infiltrationParams.getSecurityLevel());
+        log.info("작전 지휘관: {}", infiltrationParams.getOperationCommander());
+        
+        int baseInfiltrationTime = 60;
+        int infiltrationMultiplier = switch (infiltrationParams.getSecurityLevel()) {
+            case 1 -> 1; // 저보안
+            case 2 -> 2; // 중보안
+            case 3 -> 4; // 고보안
+            case 4 -> 8; // 최고 보안
+            default -> 1;
+        };
+        
+        int totalInfiltrationTime = baseInfiltrationTime * infiltrationMultiplier;
+        log.info("예상 침투 시간: {}분", totalInfiltrationTime);
+        
+        return RepeatStatus.FINISHED;
+    };
+}
+```
+
+**실행 명령:**
+```bash
+./gradlew bootRun --args='--spring.batch.job.name=terminatorJob missionName=안산_데이터센터_침투,java.lang.String operationCommander=KILL-9 securityLevel=3,java.lang.Integer,false'
+```
+
+### Job Parameters 주입 방법
+
+#### 1. @Value 어노테이션 사용
+- **표현식**: `@Value("#{jobParameters['parameterName']}")`
+- **필수 조건**: `@StepScope` 어노테이션과 함께 사용
+
+#### 2. 주입 방식
+- **필드 직접 주입**: `@Value("#{jobParameters['fieldName']}")`
+- **생성자 파라미터 주입**: 생성자에서 `@Value` 사용
+- **세터 메서드 주입**: `@Value`를 세터 메서드에 적용
+
+### 지원하는 타입
+- **기본 타입**: String, Integer, Boolean 등
+- **날짜/시간**: LocalDate, LocalDateTime, Date 등
+- **Enum**: 사용자 정의 Enum 타입
+- **기타**: DefaultConversionService가 지원하는 모든 타입
+
+### 주의사항
+- **@StepScope 필수**: Job Parameters 주입 시 반드시 필요
+- **타입 변환**: DefaultJobParametersConverter가 자동 처리
+- **ISO 표준 형식**: 날짜/시간 타입은 ISO 표준 형식 사용
+- **식별 플래그**: identifying=false로 설정 시 Job 인스턴스 식별에서 제외
