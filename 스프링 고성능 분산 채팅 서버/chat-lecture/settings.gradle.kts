@@ -6,4 +6,5 @@ rootProject.name = "chat-lecture"
 include(
     "chat-application",
     "chat-domain",
+    "chat-persistence",
 )
