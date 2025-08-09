@@ -4,5 +4,6 @@ plugins {
 rootProject.name = "chat-lecture"
 
 include(
-    "chat-application"
+    "chat-application",
+    "chat-domain",
 )
