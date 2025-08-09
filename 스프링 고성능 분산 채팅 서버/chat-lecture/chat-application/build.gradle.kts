@@ -15,7 +15,7 @@ dependencyManagement {
 dependencies {
     // 모든 하위 모듈 포함 (조립자 역할)
 //    implementation(project(":chat-api"))
-//    implementation(project(":chat-domain"))
+    implementation(project(":chat-domain"))
 //    implementation(project(":chat-persistence"))
 //    implementation(project(":chat-websocket"))
 
