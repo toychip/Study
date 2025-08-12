@@ -1,4 +1,4 @@
-package com.system.batch;
+package com.system.batch.parameter;
 
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;

@@ -1,4 +1,4 @@
-#spring:
-#  batch:
-#    job:
-#      enabled: false
+spring:
+  batch:
+    job:
+      enabled: false

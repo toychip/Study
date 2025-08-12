@@ -619,29 +619,36 @@ parameterName=parameterValue,parameterType,identificationFlag
 
 ### 다양한 타입의 Job Parameters
 
-#### 1. 기본 데이터 타입
+#### 1) 기본 데이터 타입
+
 ```java
 @Bean
 @StepScope
 public Tasklet terminatorTasklet(
-    @Value("#{jobParameters['terminatorId']}") String terminatorId, 
+    @Value("#{jobParameters['terminatorId']}") String terminatorId,
     @Value("#{jobParameters['targetCount']}") Integer targetCount
 ) {
     return (contribution, chunkContext) -> {
-        log.info("시스템 종결자 정보:");
-        log.info("ID: {}", terminatorId);
-        log.info("제거 대상 수: {}", targetCount);
+        log.info("ID: {}, 제거 대상 수: {}", terminatorId, targetCount);
         return RepeatStatus.FINISHED;
     };
 }
 ```
 
-**실행 명령:**
+**실행 예**
+
 ```bash
-./gradlew bootRun --args='--spring.batch.job.name=processTerminatorJob terminatorId=KILL-9,java.lang.String targetCount=5,java.lang.Integer'
+./gradlew bootRun --args='--spring.batch.job.name=processTerminatorJob \
+  terminatorId=KILL-9,java.lang.String targetCount=5,java.lang.Integer'
 ```
 
-#### 2. 날짜와 시간 타입
+* `@Value("#{jobParameters['키']}")`로 주입
+* **반드시 `@StepScope`(또는 `@JobScope`)가 붙은 빈에서 주입** (싱글톤 빈에서는 런타임 파라미터 바인딩 불가)
+
+---
+
+#### 2) 날짜·시간 타입
+
 ```java
 @Bean
 @StepScope
@@ -650,24 +657,31 @@ public Tasklet terminatorTasklet(
     @Value("#{jobParameters['startTime']}") LocalDateTime startTime
 ) {
     return (contribution, chunkContext) -> {
-        log.info("처형 예정일: {}", executionDate.format(DateTimeFormatter.ofPattern("yyyy년 MM월 dd일")));
-        log.info("작전 개시 시각: {}", startTime.format(DateTimeFormatter.ofPattern("yyyy년 MM월 dd일 HH시 mm분 ss초")));
+        log.info("처형 예정일: {}", executionDate);
+        log.info("작전 개시 시각: {}", startTime);
         return RepeatStatus.FINISHED;
     };
 }
 ```
 
-**실행 명령:**
+**실행 예**
+
 ```bash
-./gradlew bootRun --args='--spring.batch.job.name=terminatorJob executionDate=2024-01-01,java.time.LocalDate startTime=2024-01-01T14:30:00,java.time.LocalDateTime'
+./gradlew bootRun --args='--spring.batch.job.name=terminatorJob \
+  executionDate=2024-01-01,java.time.LocalDate \
+  startTime=2024-01-01T14:30:00,java.time.LocalDateTime'
 ```
 
-**날짜/시간 형식:**
-- **LocalDate**: 'yyyy-MM-dd' 형식
-- **LocalDateTime**: 'yyyy-MM-ddThh:mm:ss' 형식
-- **ISO 표준 형식**: DateTimeFormatter의 ISO 표준 사용
+* 형식:
 
-#### 3. Enum 타입
+  * `LocalDate` → `YYYY-MM-DD`(ISO\_LOCAL\_DATE)
+  * `LocalDateTime` → `YYYY-MM-DDTHH:MM:SS`(ISO\_LOCAL\_DATE\_TIME)
+* 변환은 `DefaultJobParametersConverter`가 처리
+
+---
+
+#### 3) Enum 타입
+
 ```java
 public enum QuestDifficulty { EASY, NORMAL, HARD, EXTREME }
 
@@ -677,100 +691,306 @@ public Tasklet terminatorTasklet(
     @Value("#{jobParameters['questDifficulty']}") QuestDifficulty questDifficulty
 ) {
     return (contribution, chunkContext) -> {
-        log.info("임무 난이도: {}", questDifficulty);
-        int baseReward = 100;
-        int rewardMultiplier = switch (questDifficulty) {
-            case EASY -> 1;
-            case NORMAL -> 2;
-            case HARD -> 3;
-            case EXTREME -> 5;
-        };
+        // questDifficulty 사용
         return RepeatStatus.FINISHED;
     };
 }
 ```
 
-**실행 명령:**
+**실행 예**
+
 ```bash
-./gradlew bootRun --args='--spring.batch.job.name=terminatorJob questDifficulty=HARD,com.system.batch.TerminatorConfig$QuestDifficulty'
+./gradlew bootRun --args='--spring.batch.job.name=terminatorJob \
+  questDifficulty=HARD,com.system.batch.TerminatorConfig$QuestDifficulty'
 ```
+
+* 내부 클래스 Enum은 `$`가 포함된 FQN 사용
+
+---
 
 ### POJO를 활용한 Job Parameters 주입
 
-#### SystemInfiltrationParameters 클래스
+#### SystemInfiltrationParameters
+
 ```java
 @StepScope
 @Component
 public class SystemInfiltrationParameters {
     @Value("#{jobParameters[missionName]}")
     private String missionName;
-    
+
     private int securityLevel;
     private final String operationCommander;
-    
-    public SystemInfiltrationParameters(@Value("#{jobParameters[operationCommander]}") String operationCommander) {
+
+    public SystemInfiltrationParameters(
+        @Value("#{jobParameters[operationCommander]}") String operationCommander) {
         this.operationCommander = operationCommander;
     }
-    
+
     @Value("#{jobParameters[securityLevel]}")
-    public void setSecurityLevel(int securityLevel) {
-        this.securityLevel = securityLevel;
-    }
-    
-    // getter 메서드들
+    public void setSecurityLevel(int securityLevel) { this.securityLevel = securityLevel; }
+
+    // getters...
 }
 ```
 
 #### POJO 사용 Tasklet
+
 ```java
 @Bean
-public Tasklet terminatorTasklet(SystemInfiltrationParameters infiltrationParams) {
+public Tasklet terminatorTasklet(SystemInfiltrationParameters params) {
     return (contribution, chunkContext) -> {
-        log.info("임무 코드네임: {}", infiltrationParams.getMissionName());
-        log.info("보안 레벨: {}", infiltrationParams.getSecurityLevel());
-        log.info("작전 지휘관: {}", infiltrationParams.getOperationCommander());
-        
-        int baseInfiltrationTime = 60;
-        int infiltrationMultiplier = switch (infiltrationParams.getSecurityLevel()) {
-            case 1 -> 1; // 저보안
-            case 2 -> 2; // 중보안
-            case 3 -> 4; // 고보안
-            case 4 -> 8; // 최고 보안
-            default -> 1;
-        };
-        
-        int totalInfiltrationTime = baseInfiltrationTime * infiltrationMultiplier;
-        log.info("예상 침투 시간: {}분", totalInfiltrationTime);
-        
+        int base = 60;
+        int mult = switch (params.getSecurityLevel()) { case 1->1; case 2->2; case 3->4; case 4->8; default->1; };
+        int total = base * mult;
+        log.info("임무: {}, 지휘관: {}, 예상 시간: {}분",
+                 params.getMissionName(), params.getOperationCommander(), total);
         return RepeatStatus.FINISHED;
     };
 }
 ```
 
-**실행 명령:**
+**실행 예**
+
 ```bash
-./gradlew bootRun --args='--spring.batch.job.name=terminatorJob missionName=안산_데이터센터_침투,java.lang.String operationCommander=KILL-9 securityLevel=3,java.lang.Integer,false'
+./gradlew bootRun --args='--spring.batch.job.name=terminatorJob \
+  missionName=안산_데이터센터_침투,java.lang.String \
+  operationCommander=KILL-9 \
+  securityLevel=3,java.lang.Integer,false'
 ```
 
-### Job Parameters 주입 방법
+* 마지막 `false`는 해당 파라미터를 **Job 인스턴스 식별에서 제외**
 
-#### 1. @Value 어노테이션 사용
-- **표현식**: `@Value("#{jobParameters['parameterName']}")`
-- **필수 조건**: `@StepScope` 어노테이션과 함께 사용
+---
 
-#### 2. 주입 방식
-- **필드 직접 주입**: `@Value("#{jobParameters['fieldName']}")`
-- **생성자 파라미터 주입**: 생성자에서 `@Value` 사용
-- **세터 메서드 주입**: `@Value`를 세터 메서드에 적용
+### Job Parameters 주입 방법 요약
 
-### 지원하는 타입
-- **기본 타입**: String, Integer, Boolean 등
-- **날짜/시간**: LocalDate, LocalDateTime, Date 등
-- **Enum**: 사용자 정의 Enum 타입
-- **기타**: DefaultConversionService가 지원하는 모든 타입
+* **표현식**: `@Value("#{jobParameters['name']}")`
+* **주입 위치**: 필드 / 생성자 파라미터 / 세터
+* **스코프 필수**: 주입 대상 빈에 `@StepScope`(또는 `@JobScope`) 부착
+* **지원 타입**: String/숫자/Boolean/Enum/`LocalDate/LocalDateTime` 등(ISO 표준 형식)
+* **식별 플래그**: `identifying=true/false`로 Job 인스턴스 식별 포함 여부 제어(생략 시 true)
 
-### 주의사항
-- **@StepScope 필수**: Job Parameters 주입 시 반드시 필요
-- **타입 변환**: DefaultJobParametersConverter가 자동 처리
-- **ISO 표준 형식**: 날짜/시간 타입은 ISO 표준 형식 사용
-- **식별 플래그**: identifying=false로 설정 시 Job 인스턴스 식별에서 제외
+---
+
+### JSON 기반 표기법(값에 `,` 등 특수 문자가 들어갈 때)
+
+기본 표기법은 `,`를 타입/플래그 구분에 사용 → 값에 쉼표가 있으면 모호해짐. **JSON 표기법 사용**.
+
+**준비**
+
+```java
+@Bean
+public JobParametersConverter jobParametersConverter() {
+    return new JsonJobParametersConverter(); // spring-boot-starter-json 필요
+}
+```
+
+**예시**
+
+```bash
+# bash/gradle bootRun에서 이스케이프 주의
+./gradlew bootRun --args="--spring.batch.job.name=terminatorJob \
+  infiltrationTargets='{\"value\":\"판교서버실,안산데이터센터\",\"type\":\"java.lang.String\"}'"
+```
+
+**JAR 실행 예**
+
+```bash
+java -jar app.jar --spring.batch.job.name=terminatorJob \
+  infiltrationTargets='{"value":"판교_서버실,안산_데이터센터","type":"java.lang.String"}'
+```
+
+---
+
+### 프로그래밍 방식으로 JobParameters 생성/전달
+
+```java
+JobParameters params = new JobParametersBuilder()
+    .addJobParameter("inputFilePath", "/data/input/users.csv", String.class) // identifying 기본 true
+    .addJobParameter("securityLevel", 3, Integer.class, false)               // 식별 제외
+    .toJobParameters();
+
+jobLauncher.run(job, params);
+```
+
+---
+
+### JobParameters 직접 접근(코드에서 조회)
+
+```java
+@Component
+@Slf4j
+public class SystemDestructionTasklet implements Tasklet {
+    @Override
+    public RepeatStatus execute(StepContribution c, ChunkContext ctx) {
+        JobParameters jp = ctx.getStepContext().getStepExecution().getJobParameters();
+        String target = jp.getString("system.target");
+        Long level = jp.getLong("system.destruction.level");
+        log.info("target={}, level={}", target, level);
+        return RepeatStatus.FINISHED;
+    }
+}
+```
+
+* `StepExecution` → 부모 `JobExecution`을 통해 `JobParameters`를 노출
+* `JobParameters`는 **불변**. 실행 중 변경 값은 **ExecutionContext**에 저장
+
+---
+
+### 커맨드라인 파라미터가 Job으로 전달되는 경로(요약)
+
+* Spring Boot가 `JobLauncherApplicationRunner`를 자동 실행
+
+  1. 컨텍스트의 `Job` 빈 수집
+  2. 여러 Job이 있으면 `--spring.batch.job.name` 필수
+  3. `key=value` 파싱 → 등록된 Converter로 `JobParameters` 변환
+  4. `JobLauncher.run(job, params)` 호출
+
+---
+
+## 파라미터 검증(Validators)
+
+### 커스텀 Validator
+
+```java
+@Component
+public class SystemDestructionValidator implements JobParametersValidator {
+    @Override
+    public void validate(@Nullable JobParameters p) throws JobParametersInvalidException {
+        if (p == null) throw new JobParametersInvalidException("파라미터가 NULL입니다");
+        Long power = p.getLong("destructionPower");
+        if (power == null) throw new JobParametersInvalidException("destructionPower는 필수");
+        if (power > 9) throw new JobParametersInvalidException("최대 허용치 초과: " + power);
+    }
+}
+```
+
+```java
+@Bean
+public Job systemDestructionJob(JobRepository repo, Step step, SystemDestructionValidator v) {
+    return new JobBuilder("systemDestructionJob", repo)
+        .validator(v)
+        .start(step)
+        .build();
+}
+```
+
+### DefaultJobParametersValidator
+
+```java
+.validator(new DefaultJobParametersValidator(
+    new String[]{"destructionPower"},  // 필수
+    new String[]{"targetSystem"}       // 선택
+))
+```
+
+* 선택 배열을 **비우지 않으면**: “필수 ∪ 선택”에 **정의되지 않은 키 거부**
+* 필수만 검사하고 나머지 허용:
+
+```java
+new DefaultJobParametersValidator(new String[]{"destructionPower"}, new String[]{})
+```
+
+---
+
+## 스코프(JobScope/StepScope) 사용 원칙과 주의사항 **(매우 중요)**
+
+### 핵심 개념
+
+* `@JobScope`: **Job 실행마다** 빈 생성/소멸(프록시 기반 지연 생성)
+* `@StepScope`: **Step 실행마다** 빈 생성/소멸
+* 장점: 런타임 파라미터 주입, 동시 실행 간 상태 분리, 실행 종료 시 자원 정리
+
+### **절대 금지: Job/Step “정의(@Bean)”에 스코프를 붙이지 말 것**
+
+* **금지 대상**: `@Bean Job ...`, `@Bean Step ...` 메서드에 `@JobScope`/`@StepScope` 부착
+* **이유**
+
+  1. **스코프 활성화 시점 불일치**
+
+     * 컨테이너가 Step 메타데이터 초기화를 위해 Step 빈에 **실행 전** 접근
+     * 이때 `step` 스코프는 아직 **비활성** →
+       `ScopeNotActiveException: Scope 'step' is not active for the current thread`
+  2. **인프라/확장 기능과 충돌**
+
+     * `JobOperator` 제어, Remote Partitioning 등에서 예기치 못한 실패 가능
+  3. **공식 권고(5.2+)**
+
+     * “A `Step` bean should not be step-scoped or job-scoped.”
+
+> **정석 패턴**
+>
+> * Job/Step 정의는 **싱글톤 빈**으로 유지
+> * 파라미터가 필요한 **Tasklet/ItemReader/ItemProcessor/ItemWriter** 에 \*\*`@StepScope`(또는 `@JobScope`)\*\*를 부여하고, Step에서는 해당 빈을 주입받아 사용
+
+```java
+// 올바른 예
+@Bean
+public Step exampleStep(JobRepository repo, PlatformTransactionManager tx,
+                        ItemReader<Foo> reader, ItemWriter<Foo> writer) {
+    return new StepBuilder("exampleStep", repo)
+        .<Foo, Foo>chunk(100, tx)
+        .reader(reader)   // reader/processor/writer는 @StepScope 가능
+        .writer(writer)
+        .build();
+}
+
+@Component
+@StepScope
+class FooReader implements ItemReader<Foo> {
+    private final String path;
+    FooReader(@Value("#{jobParameters['input']}") String path) { this.path = path; }
+    @Override public Foo read() { /*...*/ return null; }
+}
+```
+
+### 추가 주의사항
+
+* 스코프 프록시는 **CGLIB 클래스 프록시** 사용 → 클래스는 `final`이 아니어야 함(상속 가능)
+* `@StepScope`/`@JobScope`가 붙은 `@Bean` 메서드를 **직접 호출**하지 말 것(프록시 우회 위험).
+  → **빈 주입 방식**으로 참조
+* 불가피하게 메서드 직접 호출이 필요하면, 컴파일 타임 인자를 `null`로 넘기는 **Late Binding**이 가능하나, 권장하지 않음
+
+---
+
+## ExecutionContext
+
+### 역할
+
+* 사용자 상태/중간 결과 저장(메타데이터 저장소에 영속)
+* **재시작 시 자동 복원**
+* Step 간 데이터 공유는 **Job 레벨 ExecutionContext**를 통해 수행
+
+### 주입
+
+```java
+@Bean
+@JobScope
+public Tasklet jobScopedTasklet(
+  @Value("#{jobExecutionContext['previousState']}") String prev) { ... }
+
+@Bean
+@StepScope
+public Tasklet stepScopedTasklet(
+  @Value("#{stepExecutionContext['offset']}") Long offset) { ... }
+```
+
+### 접근 규칙
+
+* `jobExecutionContext`: 동일 Job 내 어디서나 접근 가능
+* `stepExecutionContext`: **해당 Step 내부에서만** 접근 가능
+* 다른 Step의 `stepExecutionContext`는 직접 접근 불가 → 공유 필요 시 Job 레벨로 승격하여 저장
+
+---
+
+## 최종 정리
+
+- 파라미터 주입 대상 컴포넌트(Tasklet/Reader/Writer/Processor)에 **`@StepScope`/`@JobScope`** 부착
+- **Job/Step 정의 빈에는 스코프 금지**(예외 없이 금지)
+- 날짜/시간은 **ISO 포맷**으로 전달 (`LocalDate`, `LocalDateTime`)
+- 값에 `,` 포함 시 **JSON 표기법 + `JsonJobParametersConverter`**
+- `identifying=true/false`를 정책에 맞게 설계(재실행/인스턴스 식별)
+- 단순 존재 검증은 `DefaultJobParametersValidator`, 규칙 검증은 커스텀 Validator
+- `JobLauncherApplicationRunner` 동작 및 Converter 적용 시점 이해
+- 변경 가능한 실행 중 데이터는 **ExecutionContext**에 저장(파라미터는 불변)

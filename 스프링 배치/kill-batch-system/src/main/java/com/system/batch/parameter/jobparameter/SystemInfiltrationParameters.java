@@ -1,4 +1,4 @@
-package com.system.batch.jobparameter;
+package com.system.batch.parameter.jobparameter;
 
 import lombok.Getter;
 import org.springframework.batch.core.configuration.annotation.StepScope;
