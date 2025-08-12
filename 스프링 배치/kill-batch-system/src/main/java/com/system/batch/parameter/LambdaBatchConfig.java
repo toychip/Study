@@ -1,4 +1,4 @@
-package com.system.batch;
+package com.system.batch.parameter;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.Job;
