@@ -896,6 +896,8 @@ new DefaultJobParametersValidator(new String[]{"destructionPower"}, new String[]
 
 ## 스코프(JobScope/StepScope) 사용 원칙과 주의사항 **(매우 중요)**
 
+![스코프 사용 원칙](https://cdn.inflearn.com/public/files/posts/8f306381-4f84-42d4-93cb-4b6f107a529b/51b67326-6a39-4d16-aebe-34f0f25e2524.png)
+
 ### 핵심 개념
 
 * `@JobScope`: **Job 실행마다** 빈 생성/소멸(프록시 기반 지연 생성)
@@ -906,6 +908,8 @@ new DefaultJobParametersValidator(new String[]{"destructionPower"}, new String[]
 
 * **금지 대상**: `@Bean Job ...`, `@Bean Step ...` 메서드에 `@JobScope`/`@StepScope` 부착
 * **이유**
+
+![금지 대상](https://cdn.inflearn.com/public/files/posts/c598dedb-4050-41c1-a57d-82b6083f72c6/d3b33cab-9c78-40ac-84f1-bbde8dcb0ef9.png)
 
   1. **스코프 활성화 시점 불일치**
 
@@ -994,3 +998,250 @@ public Tasklet stepScopedTasklet(
 - 단순 존재 검증은 `DefaultJobParametersValidator`, 규칙 검증은 커스텀 Validator
 - `JobLauncherApplicationRunner` 동작 및 Converter 적용 시점 이해
 - 변경 가능한 실행 중 데이터는 **ExecutionContext**에 저장(파라미터는 불변)
+
+## Spring Batch Listener
+
+### 1) Listener 개요
+
+배치 실행의 주요 지점에 후킹하여 로깅, 모니터링, 예외 처리, 상태 저장을 주입하는 수단
+적용 지점 요약
+
+* JobExecutionListener: Job 시작 전/후
+* StepExecutionListener: Step 시작 전/후
+* ChunkListener: 청크 시작/종료, 청크 오류
+* ItemRead/Process/WriteListener: 아이템 단위 전/후, 오류
+
+핵심 포인트
+
+* `ItemReadListener.afterRead()`는 `read()`가 `null`을 반환하면 호출되지 않음
+* `ItemProcessListener.afterProcess()`는 `process()`가 `null`을 반환해도 호출됨
+* `ItemWriteListener.afterWrite()` 호출 후 트랜잭션 커밋, 이어서 `ChunkListener.afterChunk()` 호출 흐름
+
+---
+
+### 2) 구현 방법
+
+#### 2-1. 인터페이스 구현
+
+```java
+@Component
+public class MonitoringJobListener implements JobExecutionListener {
+    @Override public void beforeJob(JobExecution je) { /* 준비 로직 */ }
+    @Override public void afterJob(JobExecution je)  { /* 정리/보고 */ }
+}
+
+@Component
+public class MonitoringStepListener implements StepExecutionListener {
+    @Override public void beforeStep(StepExecution se) { /* 시작 로그 */ }
+    @Override public ExitStatus afterStep(StepExecution se) {
+        return ExitStatus.COMPLETED;
+    }
+}
+```
+
+등록은 빌더의 `listener(...)` 사용
+
+#### 2-2. 어노테이션 기반
+
+```java
+@Component
+public class AnnotatedJobListener {
+    @BeforeJob  public void before(JobExecution je) { /* ... */ }
+    @AfterJob   public void after(JobExecution je)  { /* ... */ }
+}
+
+@Component
+public class AnnotatedStepListener {
+    @BeforeStep public void before(StepExecution se) { /* ... */ }
+    @AfterStep  public ExitStatus after(StepExecution se) { return ExitStatus.COMPLETED; }
+}
+```
+
+어노테이션 리스너도 `listener(Object)`로 등록 가능
+
+지원 어노테이션 발췌
+
+* `@BeforeJob/@AfterJob`, `@BeforeStep/@AfterStep`
+* `@BeforeChunk/@AfterChunk/@AfterChunkError`
+* `@BeforeRead/@AfterRead/@OnReadError`
+* `@BeforeProcess/@AfterProcess/@OnProcessError`
+* `@BeforeWrite/@AfterWrite/@OnWriteError`
+* `@OnSkipInRead/@OnSkipInProcess/@OnSkipInWrite`
+
+![앞뒤동작](https://cdn.inflearn.com/public/files/posts/d91d9790-96f9-447a-a86a-82434a9a9b0b/ec8025f5-96fa-449a-bf2d-f5a019e132b4.webp)
+
+---
+
+### 3) JobExecutionListener + ExecutionContext로 동적 데이터 전달
+
+동작 개요
+
+* beforeJob에서 동적 데이터 생성 후 `JobExecutionContext`에 저장
+* 각 Step에서 `jobExecutionContext`로 읽기
+* 필요한 Step에서 실행 결과를 `jobExecutionContext`에 기록
+* afterJob에서 계획·결과 집계 및 마무리 처리
+
+예시
+
+```java
+@Component
+public class InfiltrationPlanListener implements JobExecutionListener {
+    @Override
+    public void beforeJob(JobExecution je) {
+        Map<String, Object> plan = Map.of(
+            "targetSystem", "안산 데이터센터",
+            "objective", "설정 점검",
+            "requiredTools", List.of("도구A","도구B")
+        );
+        je.getExecutionContext().put("infiltrationPlan", plan);
+    }
+
+    @Override
+    public void afterJob(JobExecution je) {
+        Map<String, Object> plan = (Map<String,Object>) je.getExecutionContext().get("infiltrationPlan");
+        String result = (String) je.getExecutionContext().get("infiltrationResult");
+        // 결과 보고 처리
+    }
+}
+```
+
+Step에서 사용 및 결과 기록
+
+```java
+@Bean
+@StepScope
+public Tasklet attackTasklet(@Value("#{jobExecutionContext['infiltrationPlan']}") Map<String,Object> plan) {
+    return (contrib, ctx) -> {
+        boolean success = new java.util.Random().nextBoolean();
+        var jobCtx = contrib.getStepExecution().getJobExecution().getExecutionContext();
+        jobCtx.put("infiltrationResult", success ? "TERMINATED" : "DETECTED");
+        return RepeatStatus.FINISHED;
+    };
+}
+```
+
+규칙 요약
+
+* 입력·설정 같은 고정값은 JobParameters로 외부 주입
+* 실행 중 변하는 값은 ExecutionContext에 기록
+
+---
+
+### 4) Step 간 데이터 공유 ExecutionContextPromotionListener
+
+![step간 공유](https://cdn.inflearn.com/public/files/posts/87b15761-1c97-4089-8db4-84f0d8adaba7/2835e8e8-2dd2-4517-88d1-194e3b41cfd0.png)
+
+필요성
+
+* StepExecutionContext는 해당 Step 한정
+* 다음 Step에서 재사용하려면 JobExecutionContext로 승격 필요
+
+사용법
+
+```java
+@Bean
+public Step scanningStep(JobRepository repo, PlatformTransactionManager tx) {
+    return new StepBuilder("scanningStep", repo)
+        .tasklet((contrib, ctx) -> {
+            contrib.getStepExecution().getExecutionContext().put("targetSystem", "판교 서버실");
+            return RepeatStatus.FINISHED;
+        }, tx)
+        .listener(promotionListener())
+        .build();
+}
+
+@Bean
+public ExecutionContextPromotionListener promotionListener() {
+    ExecutionContextPromotionListener l = new ExecutionContextPromotionListener();
+    l.setKeys(new String[]{"targetSystem"});
+    return l;
+}
+
+@Bean
+@StepScope
+public Tasklet eliminationTasklet(@Value("#{jobExecutionContext['targetSystem']}") String target) {
+    return (contrib, ctx) -> {
+        // target 사용
+        return RepeatStatus.FINISHED;
+    };
+}
+```
+
+체크 포인트
+
+* 승격 리스너는 값을 넣는 Producer Step에 등록
+* 실행 순서 보장 필요
+
+---
+
+### 5) Listener + 스코프(@JobScope/@StepScope) 통합
+
+원칙
+
+* Job/Step 정의 빈에는 스코프 부착 금지
+* 런타임 주입이 필요한 컴포넌트에만 스코프 적용
+
+예시
+
+```java
+@Configuration
+public class SystemDestructionConfig {
+   @Bean
+   public Job sampleJob(JobRepository repo, Step step, JobExecutionListener listener) {
+       return new JobBuilder("sampleJob", repo)
+               .listener(listener)
+               .start(step)
+               .build();
+   }
+
+   @Bean
+   @JobScope
+   public JobExecutionListener systemTerminationListener(
+       @Value("#{jobParameters['terminationType']}") String terminationType
+   ) {
+       return new JobExecutionListener() {
+           @Override public void beforeJob(JobExecution je) { /* terminationType 사용 */ }
+           @Override public void afterJob(JobExecution je)  { /* ... */ }
+       };
+   }
+}
+```
+
+---
+
+### 6) 예외 처리와 호출 타이밍
+
+* `beforeJob`/`beforeStep` 예외 발생 시 해당 단위 실패로 간주
+* `afterJob`/`afterStep` 예외는 실행 결과 상태에 영향 없음
+* `afterChunk`는 커밋 이후 호출, `afterChunkError`는 롤백 이후 호출
+
+---
+
+### 7) 성능 및 운영 모범 사례
+
+* 리스너는 관찰·보조 책임에 집중, 비즈니스 로직 분리
+* 고빈도 리스너(Item 단위)에서 외부 I/O·무거운 연산 지양
+* ExecutionContext에는 직렬화 가능한 작은 값만 저장, 대용량은 외부 저장소에 두고 키만 저장
+* Step 간 데이터 의존성 최소화, 필요 시 승격 리스너 활용
+* 필수 입력값은 `DefaultJobParametersValidator` 또는 커스텀 Validator로 강제
+
+---
+
+### 8) 트러블슈팅 메모
+
+* `Scope 'step' is not active...` 발생 시 Step/Job 정의 빈에 스코프 부착 여부 점검
+* `@Value` 주입 NPE 발생 시 대상 빈의 `@StepScope`/`@JobScope` 누락 여부 점검
+* 승격 값 미노출 시 Producer Step에 승격 리스너 등록 여부, 키 설정, 실행 순서 점검
+* 재실행 입력값은 코드에서 `now()` 생성 대신 JobParameters 외부 주입
+
+---
+
+### 9) 요약 체크리스트
+
+* 입력·설정은 JobParameters
+* 진행·상태는 ExecutionContext
+* Step 간 공유는 ExecutionContextPromotionListener
+* 스코프는 컴포넌트에만 적용, Step/Job 정의에는 금지
+* 어노테이션 리스너와 인터페이스 리스너 혼용 가능
+* 고빈도 리스너 경량화, EC에는 작은 값만 저장
+* 필수 파라미터는 Validator로 강제
