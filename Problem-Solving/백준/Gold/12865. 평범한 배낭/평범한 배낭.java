@@ -21,7 +21,7 @@ public class Main {
         K = Integer.parseInt(input1[1]);
         bags = new ArrayList<>();
 
-        dp = new int[N][K + 1];
+        dp = new int[N][100_001];
         for (int i = 0; i < N; i++) {
             // 모든 값을 -1로 초기화 (아직 계산되지 않음)
             Arrays.fill(dp[i], -1);
