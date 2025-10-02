@@ -5,101 +5,108 @@ import java.util.LinkedList;
 import java.util.Queue;
 
 public class Main {
+
+    static int[][] board;
+    static int x;
+    static int y;
+    static int[] dx = {+1, -1, 0, 0};
+    static int[] dy = {0, 0, -1, +1};
+    static Queue<Node> queue;
+    static int answer = 0;
     public static void main(String[] args) throws IOException {
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-        int[] dx = {1, -1, 0, 0};
-        int[] dy = {0, 0, -1, 1};
-
         String[] input1 = reader.readLine().split(" ");
-        int x = Integer.parseInt(input1[0]);
-        int y = Integer.parseInt(input1[1]);
-
-        int[][] board = new int[y][x];
-        Queue<Node> queue = new LinkedList<>();
-
-        // 초기 상태 입력 및 익은 토마토 큐에 추가
+        x = Integer.parseInt(input1[0]);
+        y = Integer.parseInt(input1[1]);
+        board = new int[y][x];
+        queue = new LinkedList<>();
         for (int i = 0; i < y; i++) {
             String[] input2 = reader.readLine().split(" ");
             for (int j = 0; j < x; j++) {
                 board[i][j] = Integer.parseInt(input2[j]);
+            }
+        }
+        for (int i = 0; i < y; i++) {
+            for (int j = 0; j < x; j++) {
                 if (board[i][j] == 1) {
-                    queue.add(new Node(j, i));
+                    queue.add(new Node(i, j));
                 }
             }
         }
 
-        // 모든 토마토가 있었는가?
-        if (isNotZero(board)) {
-            System.out.println(0);
-            return;
-        }
+        boolean[][] visited = new boolean[y][x];
+        while (!queue.isEmpty()) {
+            int todaySize = queue.size();
+            boolean todayChange = false;
 
-        boolean isChanged = true;
-        int answer = 0;
-
-        while (isChanged && !queue.isEmpty()) {
-            isChanged = false;
-            int size = queue.size();
-
-            for (int i = 0; i < size; i++) {
+            for (int i = 0; i < todaySize; i++) {
                 Node currentNode = queue.poll();
-
-                for (int dir = 0; dir < 4; dir++) {
-                    int nx = currentNode.x + dx[dir];
-                    int ny = currentNode.y + dy[dir];
-
-                    if (ny >= y || nx >= x || ny < 0 || nx < 0) {
-                        continue;
-                    }
-
-                    if (board[ny][nx] == 0) {
-                        board[ny][nx] = 1;
-                        isChanged = true;
-                        queue.add(new Node(nx, ny));
-                    }
+                boolean isChanged = bfs(currentNode, visited);
+                if (isChanged) {
+                    todayChange = true;
                 }
-            }
 
-            if (isChanged) {
+            }
+            if (todayChange) {
                 answer++;
             }
         }
-        printResult(board, answer);
+        boolean result = hasZero();
+        if (result) {
+            System.out.print("-1");
+        } else {
+            System.out.print(answer);
+        }
     }
 
-    private static boolean isNotZero(final int[][] board) {
-        boolean isNotZero = true;
-        for (int[] ints : board) {
-            for (int anInt : ints) {
-                if (anInt == 0) {
-                    isNotZero = false;
-                    break;
+    private static boolean hasZero() {
+        for (int i = 0; i < y; i++) {
+            for (int j = 0; j < x; j++) {
+                if (board[i][j] == 0) {
+                    return true;
                 }
             }
         }
-        return isNotZero;
+        return false;
     }
 
-    private static void printResult(final int[][] board, final int answer) {
-        for (int[] ints : board) {
-            for (int anInt : ints) {
-                if (anInt == 0) {
-                    System.out.print(-1);
-                    return;
+    private static boolean bfs(Node node, boolean[][] visited) {
+        boolean isChanged = false;
+        for (int i = 0; i < 4; i++) {
+            int ny = node.getY() + dy[i];
+            int nx = node.getX() + dx[i];
+
+            boolean inTheBoard = ny >= 0 && nx >= 0 && y > ny && x > nx;
+            if (inTheBoard) {
+                if (board[ny][nx] == -1) continue;
+
+                boolean notRipeTomatoes = board[ny][nx] == 0;
+                if (notRipeTomatoes && !visited[ny][nx]) {
+                    visited[ny][nx] = true;
+                    board[ny][nx] = 1;
+                    queue.add(new Node(ny, nx));
+                    isChanged = true;
                 }
             }
         }
+        return isChanged;
+    }
+}
 
-        System.out.print(answer);
+class Node {
+    private final int y;
+    private final int x;
+
+    public Node(int y, int x) {
+        this.y = y;
+        this.x = x;
     }
 
-    static class Node {
-        final int x;
-        final int y;
+    public int getX() {
+        return x;
+    }
 
-        public Node(final int x, final int y) {
-            this.x = x;
-            this.y = y;
-        }
+    public int getY() {
+        return y;
     }
 }
