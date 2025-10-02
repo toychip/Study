@@ -5,62 +5,80 @@ import java.util.LinkedList;
 import java.util.Queue;
 
 public class Main {
+
+    static int y;
+    static int x;
+
+    static int[][] board;
+    static boolean[][] visited;
+    static int[][] dist;
+
+    static int[] dy = {-1, 1, 0, 0};
+    static int[] dx = {0, 0, -1, 1};
+
     public static void main(String[] args) throws IOException {
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-        int[] dx = {1, -1, 0, 0};
-        int[] dy = {0, 0, -1, 1};
-
         String[] input1 = reader.readLine().split(" ");
-        int N = Integer.parseInt(input1[0]);
-        int M = Integer.parseInt(input1[1]);
-        int[][] board = new int[N][M];
-        int[][] dist = new int[N][M];
-        boolean[][] visited = new boolean[N][M];
+        y = Integer.parseInt(input1[0]);
+        x = Integer.parseInt(input1[1]);
+        board = new int[y][x];
+        visited = new boolean[y][x];
+        dist = new int[y][x];
 
-        for (int i = 0; i < N; i++) {
+        for (int i = 0; i < y; i++) {
             String[] input2 = reader.readLine().split("");
-            for (int j = 0; j < M; j++) {
+            for (int j = 0; j < x; j++) {
                 board[i][j] = Integer.parseInt(input2[j]);
             }
         }
 
-        Queue<Node> queue = new LinkedList<>();
+        int answer = bfs();
+        System.out.print(answer);
+    }
 
+    private static int bfs() {
+        Queue<Node> queue = new LinkedList<>();
         queue.add(new Node(0, 0));
         visited[0][0] = true;
         dist[0][0] = 1;
 
         while (!queue.isEmpty()) {
             Node currentNode = queue.poll();
+            int cx = currentNode.getX();
+            int cy = currentNode.getY();
 
-            for (int dir = 0; dir < 4; dir++) {
-                int y = currentNode.y;
-                int x = currentNode.x;
+            for (int i = 0; i < 4; i++) {
+                int nx = cx + dx[i];
+                int ny = cy + dy[i];
 
-                int ny = y + dy[dir];
-                int nx = x + dx[dir];
-
-                if (nx < 0 || ny < 0 || nx >= M || ny >= N) continue;
-
-                if (board[ny][nx] == 0 || visited[ny][nx]) continue;
-
-                visited[ny][nx] = true;
-                dist[ny][nx] = dist[y][x] + 1;
-                queue.add(new Node(ny, nx));
+                if (nx >= 0 && ny >= 0 && x > nx && y > ny && !visited[ny][nx] && board[ny][nx] == 1) {
+                    queue.add(new Node(ny, nx));
+                    visited[ny][nx] = true;
+                    dist[ny][nx] = dist[cy][cx] + 1;
+                    if ((ny == y - 1) && (nx == x - 1)) {
+                        return dist[ny][nx];
+                    }
+                }
             }
         }
-        int result = dist[N - 1][M - 1];
-        System.out.print(result);
+        throw new RuntimeException();
+    }
+}
 
+class Node {
+    private final int y;
+    private final int x;
+
+    public Node(int y, int x) {
+        this.y = y;
+        this.x = x;
     }
 
-    static class Node {
-        int y;
-        int x;
+    public int getY() {
+        return y;
+    }
 
-        public Node(final int y, final int x) {
-            this.y = y;
-            this.x = x;
-        }
+    public int getX() {
+        return x;
     }
 }
